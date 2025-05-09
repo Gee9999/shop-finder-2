@@ -35,6 +35,10 @@ keyword_variants = ["supplier", "wholesaler", "distributor", "store", "shop"]
 if extra_keywords:
     keyword_variants += [kw.strip() for kw in extra_keywords.split(",") if kw.strip()]
 
+headers = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
+}
+
 if st.button("🔍 Find Leads"):
     if not categories_input:
         st.warning("Please enter at least one product category.")
@@ -46,23 +50,26 @@ if st.button("🔍 Find Leads"):
         location = f"{city}, {country}" if city else country
 
         with st.spinner("Searching the web..."):
-            with DDGS() as ddgs:
+            with DDGS(headers=headers) as ddgs:
                 for cat in categories:
                     for variant in keyword_variants:
                         query = f"{cat} {variant} in {location}"
-                        results = ddgs.text(query, region='wt-wt', safesearch='Off', max_results=num_results)
-                        for r in results:
-                            url = r.get("href")
-                            if url and url not in seen_urls:
-                                seen_urls.add(url)
-                                all_data.append({
-                                    "name": r.get("title"),
-                                    "url": url,
-                                    "snippet": r.get("body"),
-                                    "category": cat,
-                                    "location": location,
-                                    "query": query
-                                })
+                        try:
+                            results = ddgs.text(query, region='wt-wt', safesearch='Off', max_results=num_results)
+                            for r in results:
+                                url = r.get("href")
+                                if url and url not in seen_urls:
+                                    seen_urls.add(url)
+                                    all_data.append({
+                                        "name": r.get("title"),
+                                        "url": url,
+                                        "snippet": r.get("body"),
+                                        "category": cat,
+                                        "location": location,
+                                        "query": query
+                                    })
+                        except Exception as e:
+                            st.error(f"❌ Error on query: {query}\n{str(e)}")
 
         if all_data:
             df = pd.DataFrame(all_data)
