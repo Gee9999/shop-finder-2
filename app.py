@@ -6,9 +6,8 @@ from datetime import datetime
 
 st.set_page_config(page_title="Shop Finder | Powered by Proto Trading", layout="centered")
 
-# Title with fixed markdown
-st.markdown("## Shop Finder  
-**Powered by Proto Trading**")
+# Header
+st.markdown("<h1 style='color:#001f3f;'>Shop Finder</h1><h4>Powered by Proto Trading</h4>", unsafe_allow_html=True)
 st.markdown("---")
 
 # --- Inputs ---
