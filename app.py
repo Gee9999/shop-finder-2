@@ -8,57 +8,44 @@ import requests
 
 st.set_page_config(page_title="Shop Finder | Powered by Proto Trading", layout="centered")
 
-# Header
 st.markdown("<h1 style='color:#001f3f;'>Shop Finder</h1><h4>Powered by Proto Trading</h4>", unsafe_allow_html=True)
 st.markdown("---")
 
-# Blacklist patterns
 blacklist_patterns = [
-    "sentry.wixpress.com",
-    "sentry.io",
-    "wixpress.com",
-    "lodash@", "react@", "polyfill@", "core-js",
-    "@2x.", "@3x.", ".png", ".jpg", ".jpeg",
-    "your@email.com", "example.com", "liputra.com"
+    "sentry", "bootstrap", "react@", "example.com", "your@email.com",
+    "@2x.", "@3x.", ".jpg", ".jpeg", ".png", ".webp", ".svg", "favicon"
 ]
 
 def is_valid_email(email):
-    for pattern in blacklist_patterns:
-        if pattern.lower() in email.lower():
-            return False
-    return True
+    return all(p not in email.lower() for p in blacklist_patterns)
 
-def extract_first_valid_email(url):
+def prioritize_email(emails):
+    """Returns the best email based on preferred patterns."""
+    priority = ["info@", "sales@", "support@", "admin@", "contact@", "hello@", "enquiries@"]
+    business_first = sorted([e for e in emails if not any(free in e for free in ["gmail.com", "yahoo.com", "hotmail.com"])])
+    all_sorted = sorted(business_first or emails, key=lambda x: (not any(p in x for p in priority), len(x)))
+    return all_sorted[0] if all_sorted else ""
+
+def extract_best_email(url):
     def fetch(url):
         try:
-            headers = {
-                "User-Agent": "Mozilla/5.0"
-            }
-            response = requests.get(url, headers=headers, timeout=5)
-            if response.ok:
-                return response.text
+            headers = {"User-Agent": "Mozilla/5.0"}
+            r = requests.get(url, headers=headers, timeout=5)
+            return r.text if r.ok else ""
         except Exception:
             return ""
-        return ""
 
-    email_set = set()
-    main_html = fetch(url)
-    contact_html = fetch(url.rstrip('/') + "/contact")
+    combined_html = fetch(url) + fetch(url.rstrip("/") + "/contact")
+    raw_emails = set(re.findall(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", combined_html))
+    filtered = [e for e in raw_emails if is_valid_email(e)]
+    best_email = prioritize_email(filtered)
+    return best_email, "✅" if best_email else "❌"
 
-    for html in [main_html, contact_html]:
-        found = re.findall(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", html)
-        email_set.update([e for e in found if is_valid_email(e)])
-
-    email_list = list(email_set)
-    if email_list:
-        return email_list[0], "✅"
-    else:
-        return "", "❌"
-
-# --- Inputs ---
+# --- UI Inputs ---
 categories_input = st.text_area("📦 Product Categories (one per line)", height=100, help="e.g. beads, handbags, electronics")
 country = st.selectbox("🌍 Country", sorted([
-    "South Africa", "Kenya", "Nigeria", "Ghana", "Namibia", "Botswana", "Zimbabwe", "Uganda", "Tanzania", "Zambia", "Mozambique", "Egypt", "Ethiopia", "Morocco", "Rwanda"
+    "South Africa", "Kenya", "Nigeria", "Ghana", "Namibia", "Botswana", "Zimbabwe", "Uganda", "Tanzania",
+    "Zambia", "Mozambique", "Egypt", "Ethiopia", "Morocco", "Rwanda"
 ]), help="Select a country in Africa")
 
 city = st.text_input("🏙️ City (optional)", help="Optional: Cape Town, Nairobi, etc.")
@@ -66,13 +53,10 @@ extra_keywords = st.text_input("➕ Extra Keywords (optional)", help="Add more l
 num_results = st.slider("🔁 Max results per search", 1, 20, 10)
 
 keyword_variants = ["supplier", "wholesaler", "distributor", "store", "shop"]
-
 if extra_keywords:
     keyword_variants += [kw.strip() for kw in extra_keywords.split(",") if kw.strip()]
 
-headers = {
-    "User-Agent": "Mozilla/5.0"
-}
+headers = {"User-Agent": "Mozilla/5.0"}
 
 if st.button("🔍 Find Leads"):
     if not categories_input:
@@ -81,10 +65,9 @@ if st.button("🔍 Find Leads"):
         categories = [line.strip() for line in categories_input.splitlines() if line.strip()]
         all_data = []
         seen_urls = set()
-
         location = f"{city}, {country}" if city else country
 
-        with st.spinner("Searching and storing valid emails..."):
+        with st.spinner("Searching and selecting best emails..."):
             with DDGS(headers=headers) as ddgs:
                 for cat in categories:
                     for variant in keyword_variants:
@@ -95,7 +78,7 @@ if st.button("🔍 Find Leads"):
                                 url = r.get("href")
                                 if url and url not in seen_urls:
                                     seen_urls.add(url)
-                                    email, is_valid = extract_first_valid_email(url)
+                                    email, is_valid = extract_best_email(url)
                                     all_data.append({
                                         "name": r.get("title"),
                                         "url": url,
@@ -111,14 +94,13 @@ if st.button("🔍 Find Leads"):
 
         if all_data:
             df = pd.DataFrame(all_data)
-            st.success(f"✅ Found {len(df)} unique leads.")
+            st.success(f"✅ Found {len(df)} leads with best email extracted.")
             st.dataframe(df)
 
-            # Excel download
             buffer = BytesIO()
             df.to_excel(buffer, index=False)
             buffer.seek(0)
             filename = f"shop_finder_leads_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
             st.download_button("📥 Download Excel", buffer, file_name=filename, mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         else:
-            st.info("No results found. Try other keywords or categories.")
+            st.info("No results found. Try different keywords or fewer filters.")
