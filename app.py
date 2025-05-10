@@ -13,17 +13,26 @@ st.markdown("<h1 style='color:#001f3f;'>Shop Finder</h1><h4>Powered by Proto Tra
 st.markdown("---")
 
 def extract_email_from_url(url):
-    try:
-        headers = {
-            "User-Agent": "Mozilla/5.0"
-        }
-        response = requests.get(url, headers=headers, timeout=5)
-        if response.ok:
-            emails = set(re.findall(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", response.text))
-            return ', '.join(emails) if emails else ""
-    except Exception:
-        pass
-    return ""
+    def fetch(url):
+        try:
+            headers = {
+                "User-Agent": "Mozilla/5.0"
+            }
+            response = requests.get(url, headers=headers, timeout=5)
+            if response.ok:
+                return response.text
+        except Exception:
+            return ""
+        return ""
+
+    email_set = set()
+    main_html = fetch(url)
+    contact_html = fetch(url.rstrip('/') + "/contact")
+
+    for html in [main_html, contact_html]:
+        email_set.update(re.findall(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", html))
+
+    return ', '.join(email_set) if email_set else ""
 
 # --- Inputs ---
 categories_input = st.text_area("📦 Product Categories (one per line)", height=100, help="e.g. beads, handbags, electronics")
@@ -54,7 +63,7 @@ if st.button("🔍 Find Leads"):
 
         location = f"{city}, {country}" if city else country
 
-        with st.spinner("Searching the web and extracting emails..."):
+        with st.spinner("Searching and checking contact pages..."):
             with DDGS(headers=headers) as ddgs:
                 for cat in categories:
                     for variant in keyword_variants:
