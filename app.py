@@ -12,6 +12,21 @@ st.set_page_config(page_title="Shop Finder | Powered by Proto Trading", layout="
 st.markdown("<h1 style='color:#001f3f;'>Shop Finder</h1><h4>Powered by Proto Trading</h4>", unsafe_allow_html=True)
 st.markdown("---")
 
+# Blacklist patterns
+blacklist_patterns = [
+    "sentry.wixpress.com",
+    "sentry.io",
+    "wixpress.com",
+    "lodash@", "react@", "polyfill@", "core-js",
+    "@2x.", "@3x.", ".png", ".jpg"
+]
+
+def is_valid_email(email):
+    for pattern in blacklist_patterns:
+        if pattern.lower() in email.lower():
+            return False
+    return True
+
 def extract_email_from_url(url):
     def fetch(url):
         try:
@@ -30,7 +45,8 @@ def extract_email_from_url(url):
     contact_html = fetch(url.rstrip('/') + "/contact")
 
     for html in [main_html, contact_html]:
-        email_set.update(re.findall(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", html))
+        found = re.findall(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", html)
+        email_set.update([e for e in found if is_valid_email(e)])
 
     return ', '.join(email_set) if email_set else ""
 
@@ -63,7 +79,7 @@ if st.button("🔍 Find Leads"):
 
         location = f"{city}, {country}" if city else country
 
-        with st.spinner("Searching and checking contact pages..."):
+        with st.spinner("Searching and scanning contact pages..."):
             with DDGS(headers=headers) as ddgs:
                 for cat in categories:
                     for variant in keyword_variants:
