@@ -5,6 +5,7 @@ from io import BytesIO
 from datetime import datetime
 import re
 import requests
+from urllib.parse import urlparse
 
 st.set_page_config(page_title="Shop Finder | Powered by Proto Trading", layout="centered")
 st.markdown("<h1 style='color:#001f3f;'>Shop Finder</h1><h4>Powered by Proto Trading</h4>", unsafe_allow_html=True)
@@ -14,6 +15,8 @@ blacklist_patterns = [
     "sentry", "bootstrap", "react@", "example.com", "your@email.com",
     "@2x.", "@3x.", ".jpg", ".jpeg", ".png", ".webp", ".svg", "favicon"
 ]
+
+HUNTER_API_KEY = "9fe1766be5de1514e0e7b9e3d3eb1a338a47c4e0"
 
 def is_valid_email(email):
     return all(p not in email.lower() for p in blacklist_patterns)
@@ -27,31 +30,52 @@ def prioritize_email(emails):
 def extract_best_email(url):
     def fetch(url):
         try:
-            headers = {"User-Agent": "Mozilla/5.0"}
+            headers = { "User-Agent": "Mozilla/5.0" }
             r = requests.get(url, headers=headers, timeout=5)
             return r.text if r.ok else ""
         except Exception:
             return ""
 
-    combined_html = fetch(url) + fetch(url.rstrip("/") + "/contact")
-    raw_emails = set(re.findall(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", combined_html))
-    filtered = [e for e in raw_emails if is_valid_email(e)]
-    best_email = prioritize_email(filtered)
-    return best_email
+    html = fetch(url) + fetch(url.rstrip("/") + "/contact")
+    emails = set(re.findall(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", html))
+    filtered = [e for e in emails if is_valid_email(e)]
+    return prioritize_email(filtered)
 
 def extract_snippet_emails(snippet):
     found = re.findall(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", snippet)
     return [e for e in found if is_valid_email(e)]
 
+def extract_domain(url):
+    try:
+        parsed = urlparse(url)
+        return parsed.netloc.replace("www.", "")
+    except:
+        return ""
+
+def fetch_hunter_email(domain):
+    if not domain:
+        return ""
+    try:
+        r = requests.get(
+            f"https://api.hunter.io/v2/domain-search?domain={domain}&api_key={HUNTER_API_KEY}"
+        )
+        if r.ok:
+            data = r.json()
+            emails = data.get("data", {}).get("emails", [])
+            if emails:
+                return emails[0].get("value")
+    except:
+        return ""
+    return ""
+
 # --- UI Inputs ---
-categories_input = st.text_area("📦 Product Categories (one per line)", height=100, help="e.g. beads, handbags, electronics")
+categories_input = st.text_area("📦 Product Categories (one per line)", height=100)
 country = st.selectbox("🌍 Country", sorted([
     "South Africa", "Kenya", "Nigeria", "Ghana", "Namibia", "Botswana", "Zimbabwe", "Uganda", "Tanzania",
     "Zambia", "Mozambique", "Egypt", "Ethiopia", "Morocco", "Rwanda"
-]), help="Select a country in Africa")
-
-city = st.text_input("🏙️ City (optional)", help="Optional: Cape Town, Nairobi, etc.")
-extra_keywords = st.text_input("➕ Extra Keywords (optional)", help="Add more like 'importer, manufacturer'")
+]))
+city = st.text_input("🏙️ City (optional)")
+extra_keywords = st.text_input("➕ Extra Keywords (optional)")
 num_results = st.slider("🔁 Max results per search", 1, 20, 10)
 
 keyword_variants = ["supplier", "wholesaler", "distributor", "store", "shop"]
@@ -69,7 +93,7 @@ if st.button("🔍 Find Leads"):
         seen_urls = set()
         location = f"{city}, {country}" if city else country
 
-        with st.spinner("Searching and auto-prioritizing email sources..."):
+        with st.spinner("Running search with Hunter.io fallback..."):
             with DDGS(headers=headers) as ddgs:
                 for cat in categories:
                     for variant in keyword_variants:
@@ -81,20 +105,27 @@ if st.button("🔍 Find Leads"):
                                 if url and url not in seen_urls:
                                     seen_urls.add(url)
                                     snippet = r.get("body") or ""
-                                    snippet_emails = extract_snippet_emails(snippet)
-                                    snippet_email_best = prioritize_email(snippet_emails)
-                                    extracted_email = extract_best_email(url)
+                                    domain = extract_domain(url)
 
-                                    # Use main method first, fallback to snippet email
-                                    final_email = extracted_email or snippet_email_best
-                                    is_valid = "✅" if final_email else "❌"
+                                    # Try main HTML/email extraction
+                                    main_email = extract_best_email(url)
+                                    if not main_email:
+                                        # Fallback to snippet
+                                        snippet_emails = extract_snippet_emails(snippet)
+                                        main_email = prioritize_email(snippet_emails)
+                                    if not main_email:
+                                        # Fallback to Hunter.io
+                                        main_email = fetch_hunter_email(domain)
+
+                                    is_valid = "✅" if main_email else "❌"
 
                                     all_data.append({
                                         "name": r.get("title"),
                                         "url": url,
                                         "snippet": snippet,
-                                        "email": final_email,
+                                        "email": main_email,
                                         "is_valid_email": is_valid,
+                                        "source": domain,
                                         "category": cat,
                                         "location": location,
                                         "query": query
@@ -113,4 +144,4 @@ if st.button("🔍 Find Leads"):
             filename = f"shop_finder_leads_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
             st.download_button("📥 Download Excel", buffer, file_name=filename, mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         else:
-            st.info("No results found. Try other keywords or categories.")
+            st.info("No results found. Try a broader category or fewer filters.")
