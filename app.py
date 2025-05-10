@@ -3,12 +3,27 @@ import pandas as pd
 from duckduckgo_search import DDGS
 from io import BytesIO
 from datetime import datetime
+import re
+import requests
 
 st.set_page_config(page_title="Shop Finder | Powered by Proto Trading", layout="centered")
 
 # Header
 st.markdown("<h1 style='color:#001f3f;'>Shop Finder</h1><h4>Powered by Proto Trading</h4>", unsafe_allow_html=True)
 st.markdown("---")
+
+def extract_email_from_url(url):
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0"
+        }
+        response = requests.get(url, headers=headers, timeout=5)
+        if response.ok:
+            emails = set(re.findall(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", response.text))
+            return ', '.join(emails) if emails else ""
+    except Exception:
+        pass
+    return ""
 
 # --- Inputs ---
 categories_input = st.text_area("📦 Product Categories (one per line)", height=100, help="e.g. beads, handbags, electronics")
@@ -26,7 +41,7 @@ if extra_keywords:
     keyword_variants += [kw.strip() for kw in extra_keywords.split(",") if kw.strip()]
 
 headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
+    "User-Agent": "Mozilla/5.0"
 }
 
 if st.button("🔍 Find Leads"):
@@ -39,7 +54,7 @@ if st.button("🔍 Find Leads"):
 
         location = f"{city}, {country}" if city else country
 
-        with st.spinner("Searching the web..."):
+        with st.spinner("Searching the web and extracting emails..."):
             with DDGS(headers=headers) as ddgs:
                 for cat in categories:
                     for variant in keyword_variants:
@@ -50,10 +65,12 @@ if st.button("🔍 Find Leads"):
                                 url = r.get("href")
                                 if url and url not in seen_urls:
                                     seen_urls.add(url)
+                                    email = extract_email_from_url(url)
                                     all_data.append({
                                         "name": r.get("title"),
                                         "url": url,
                                         "snippet": r.get("body"),
+                                        "email": email,
                                         "category": cat,
                                         "location": location,
                                         "query": query
