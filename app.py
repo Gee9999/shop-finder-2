@@ -50,7 +50,10 @@ def extract_first_valid_email(url):
         email_set.update([e for e in found if is_valid_email(e)])
 
     email_list = list(email_set)
-    return (email_list[0], True) if email_list else ("", False)
+    if email_list:
+        return email_list[0], "✅"
+    else:
+        return "", "❌"
 
 # --- Inputs ---
 categories_input = st.text_area("📦 Product Categories (one per line)", height=100, help="e.g. beads, handbags, electronics")
@@ -81,7 +84,7 @@ if st.button("🔍 Find Leads"):
 
         location = f"{city}, {country}" if city else country
 
-        with st.spinner("Searching, filtering, and extracting clean emails..."):
+        with st.spinner("Searching and storing valid emails..."):
             with DDGS(headers=headers) as ddgs:
                 for cat in categories:
                     for variant in keyword_variants:
@@ -98,7 +101,7 @@ if st.button("🔍 Find Leads"):
                                         "url": url,
                                         "snippet": r.get("body"),
                                         "email": email,
-                                        "is_valid_email": "✅" if is_valid else "❌",
+                                        "is_valid_email": is_valid,
                                         "category": cat,
                                         "location": location,
                                         "query": query
