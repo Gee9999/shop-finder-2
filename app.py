@@ -7,7 +7,6 @@ import re
 import requests
 
 st.set_page_config(page_title="Shop Finder | Powered by Proto Trading", layout="centered")
-
 st.markdown("<h1 style='color:#001f3f;'>Shop Finder</h1><h4>Powered by Proto Trading</h4>", unsafe_allow_html=True)
 st.markdown("---")
 
@@ -20,7 +19,6 @@ def is_valid_email(email):
     return all(p not in email.lower() for p in blacklist_patterns)
 
 def prioritize_email(emails):
-    """Returns the best email based on preferred patterns."""
     priority = ["info@", "sales@", "support@", "admin@", "contact@", "hello@", "enquiries@"]
     business_first = sorted([e for e in emails if not any(free in e for free in ["gmail.com", "yahoo.com", "hotmail.com"])])
     all_sorted = sorted(business_first or emails, key=lambda x: (not any(p in x for p in priority), len(x)))
@@ -39,7 +37,11 @@ def extract_best_email(url):
     raw_emails = set(re.findall(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", combined_html))
     filtered = [e for e in raw_emails if is_valid_email(e)]
     best_email = prioritize_email(filtered)
-    return best_email, "✅" if best_email else "❌"
+    return best_email
+
+def extract_snippet_emails(snippet):
+    found = re.findall(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", snippet)
+    return [e for e in found if is_valid_email(e)]
 
 # --- UI Inputs ---
 categories_input = st.text_area("📦 Product Categories (one per line)", height=100, help="e.g. beads, handbags, electronics")
@@ -67,7 +69,7 @@ if st.button("🔍 Find Leads"):
         seen_urls = set()
         location = f"{city}, {country}" if city else country
 
-        with st.spinner("Searching and selecting best emails..."):
+        with st.spinner("Searching and auto-prioritizing email sources..."):
             with DDGS(headers=headers) as ddgs:
                 for cat in categories:
                     for variant in keyword_variants:
@@ -78,12 +80,20 @@ if st.button("🔍 Find Leads"):
                                 url = r.get("href")
                                 if url and url not in seen_urls:
                                     seen_urls.add(url)
-                                    email, is_valid = extract_best_email(url)
+                                    snippet = r.get("body") or ""
+                                    snippet_emails = extract_snippet_emails(snippet)
+                                    snippet_email_best = prioritize_email(snippet_emails)
+                                    extracted_email = extract_best_email(url)
+
+                                    # Use main method first, fallback to snippet email
+                                    final_email = extracted_email or snippet_email_best
+                                    is_valid = "✅" if final_email else "❌"
+
                                     all_data.append({
                                         "name": r.get("title"),
                                         "url": url,
-                                        "snippet": r.get("body"),
-                                        "email": email,
+                                        "snippet": snippet,
+                                        "email": final_email,
                                         "is_valid_email": is_valid,
                                         "category": cat,
                                         "location": location,
@@ -94,7 +104,7 @@ if st.button("🔍 Find Leads"):
 
         if all_data:
             df = pd.DataFrame(all_data)
-            st.success(f"✅ Found {len(df)} leads with best email extracted.")
+            st.success(f"✅ Found {len(df)} leads.")
             st.dataframe(df)
 
             buffer = BytesIO()
@@ -103,4 +113,4 @@ if st.button("🔍 Find Leads"):
             filename = f"shop_finder_leads_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
             st.download_button("📥 Download Excel", buffer, file_name=filename, mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         else:
-            st.info("No results found. Try different keywords or fewer filters.")
+            st.info("No results found. Try other keywords or categories.")
