@@ -18,7 +18,8 @@ blacklist_patterns = [
     "sentry.io",
     "wixpress.com",
     "lodash@", "react@", "polyfill@", "core-js",
-    "@2x.", "@3x.", ".png", ".jpg"
+    "@2x.", "@3x.", ".png", ".jpg", ".jpeg",
+    "your@email.com", "example.com", "liputra.com"
 ]
 
 def is_valid_email(email):
@@ -27,7 +28,7 @@ def is_valid_email(email):
             return False
     return True
 
-def extract_email_from_url(url):
+def extract_first_valid_email(url):
     def fetch(url):
         try:
             headers = {
@@ -48,7 +49,8 @@ def extract_email_from_url(url):
         found = re.findall(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", html)
         email_set.update([e for e in found if is_valid_email(e)])
 
-    return ', '.join(email_set) if email_set else ""
+    email_list = list(email_set)
+    return (email_list[0], True) if email_list else ("", False)
 
 # --- Inputs ---
 categories_input = st.text_area("📦 Product Categories (one per line)", height=100, help="e.g. beads, handbags, electronics")
@@ -79,7 +81,7 @@ if st.button("🔍 Find Leads"):
 
         location = f"{city}, {country}" if city else country
 
-        with st.spinner("Searching and scanning contact pages..."):
+        with st.spinner("Searching, filtering, and extracting clean emails..."):
             with DDGS(headers=headers) as ddgs:
                 for cat in categories:
                     for variant in keyword_variants:
@@ -90,12 +92,13 @@ if st.button("🔍 Find Leads"):
                                 url = r.get("href")
                                 if url and url not in seen_urls:
                                     seen_urls.add(url)
-                                    email = extract_email_from_url(url)
+                                    email, is_valid = extract_first_valid_email(url)
                                     all_data.append({
                                         "name": r.get("title"),
                                         "url": url,
                                         "snippet": r.get("body"),
                                         "email": email,
+                                        "is_valid_email": "✅" if is_valid else "❌",
                                         "category": cat,
                                         "location": location,
                                         "query": query
