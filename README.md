@@ -1,16 +1,13 @@
 
-# Shop Finder – Clean Edition
+# Shop Finder Clean – DuckDuckGo / Bing Edition
 
-Streamlit app to discover shop / business websites and email addresses by keyword and location.
+## Secrets
+* `BING_API_KEY` – required only when using Bing engine
+* `HUNTER_API_KEY` – optional for email enrichment
 
-## Secrets required
-```
-GOOGLE_API_KEY = "your-google-api-key"
-GOOGLE_CX      = "your-search-engine-id"
-HUNTER_API_KEY = "optional-hunter-key"
-```
+DuckDuckGo engine needs no key and is unlimited (but slower).
 
-## Run locally
+## Run
 ```bash
 pip install -r requirements.txt
 streamlit run app.py
