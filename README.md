@@ -1,20 +1,13 @@
 
-# Leads Finder – Clean Edition
+# Leads Finder
 
-Streamlit app to discover business websites and e‑mail addresses by keyword and location.
+Streamlit app that builds a cumulative Excel database (`leads_database.xlsx`) of websites and email addresses for any keyword & location search.
 
-## Supported search engines
-* **DuckDuckGo** – unlimited, no key required.
-* **Bing Web Search API** – set `BING_API_KEY` in secrets for 1 000 free queries/month.
+## Engines
+* **DuckDuckGo (randomized start page)** – no key needed.
+* **Bing Web Search API** – add `BING_API_KEY` secret (1 000 free queries/month).
 
-## Optional enrichment
-* `HUNTER_API_KEY` – Hunter.io Domain Search for additional emails.
-
-## Secrets example
-```
-BING_API_KEY   = "your-bing-key"
-HUNTER_API_KEY = "optional-hunter-key"
-```
+Optional Hunter.io enrichment with `HUNTER_API_KEY`.
 
 ## Run locally
 ```bash
