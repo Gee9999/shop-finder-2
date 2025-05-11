@@ -1,4 +1,7 @@
-streamlit
+
+streamlit>=1.45.0
 pandas
-duckduckgo_search
+aiohttp
+requests
 openpyxl
+google-api-python-client==2.129.0
