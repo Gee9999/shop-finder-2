@@ -1,15 +1,17 @@
 
 # Leads Finder
 
-Streamlit app that builds a cumulative Excel database (`leads_database.xlsx`) of websites and email addresses for any keyword & location search.
+Keeps a cumulative `leads_database.xlsx` file on the server and merges new
+searches into it each run.
 
 ## Engines
-* **DuckDuckGo (randomized start page)** – no key needed.
-* **Bing Web Search API** – add `BING_API_KEY` secret (1 000 free queries/month).
+* DuckDuckGo (randomized start page) – no key.
+* Bing Web Search API – set `BING_API_KEY`.
 
-Optional Hunter.io enrichment with `HUNTER_API_KEY`.
+## Optional
+* `HUNTER_API_KEY` for email enrichment.
 
-## Run locally
+## Run
 ```bash
 pip install -r requirements.txt
 streamlit run app.py
