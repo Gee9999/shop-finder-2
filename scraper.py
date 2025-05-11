@@ -1,5 +1,6 @@
 
 import os, re, asyncio, aiohttp, requests, random
+from random import sample
 from duckduckgo_search import DDGS
 
 BING_KEY = os.getenv("BING_API_KEY")
@@ -7,12 +8,15 @@ BING_KEY = os.getenv("BING_API_KEY")
 EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 NEGATIVE = {"directory","yellowpages","listing","mapquest"}
 
-def ddg_random_search(query, max_results):
-    page = random.randint(1, 20)
+def ddg_random_search(query: str, max_results: int):
+    pool_size = max_results * 20  # simulate pages 1‑20
     with DDGS() as ddgs:
-        raw = ddgs.text(query, max_results=max_results, page=page)
-        urls = [r["href"] for r in raw if r.get("href","").startswith("http")]
-    return [u for u in urls if not any(n in u for n in NEGATIVE)]
+        raw = ddgs.text(query, max_results=pool_size)
+        urls = [r["href"] for r in raw if r.get("href", "").startswith("http")]
+    urls = [u for u in urls if not any(n in u for n in NEGATIVE)]
+    if len(urls) <= max_results:
+        return urls
+    return sample(urls, max_results)
 
 def bing_search(query, max_results, api_key):
     if not api_key:
